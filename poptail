@@ -14,7 +14,52 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-set -eu
+readonly help_msg="\
+Usage: poptail [OPTION]... FILE
+
+Print the last 10 lines of FILE to standard output, and remove the last 10
+lines from FILE.
+
+This is done by reading from the tail of the file and then truncating to the
+position immediately prior to the tail.  Since only the tail is read and no
+part of the file is rewritten, the operation is efficient even for large
+files.
+
+The FILE is locked while it is read and truncated, so poptail can be called
+using parallel to batch process the lines of a file.
+
+Options:
+  -c K  output the last K bytes; alternatively, use -c +K to output bytes
+        starting with the Kth (like tail -c)
+  -n K  output the last K lines, instead of the last 10; or use -n +K to
+        output lines starting with the Kth (like tail -n)
+  -N    dry-run; output the tail of the file and a one-line message of how
+        many bytes would be remove from the file
+  -h    display this help and exit
+  -v    output version and exit
+
+The -c and -n options are passed to tail, which is used to read the end of the
+file.  See the tail man page for an explanation of the details of those
+options, including using '+' as the first character of K and optional
+multiplier suffixes.
+"
+
+readonly version_msg="\
+poptail 0.1.0
+
+Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.  There is
+NO WARRANTY, to the extent permitted by law.
+
+Written by Don March.
+"
+
+readonly usage_msg="Try 'poptail -h' for more information."
+
+not_being_sourced () { [[ "$0" == "$BASH_SOURCE" ]]; }
+
+not_being_sourced && set -eu
 set -o pipefail
 
 readonly lockfile_path=/var/lock
@@ -92,7 +137,7 @@ parse_args () {
             v) show_version
                exit 0
                ;;
-            *) usage_msg && exit 1
+            *) die_usage
         esac
     done
     shift $((OPTIND-1))
@@ -106,61 +151,22 @@ die_lock_error () {
 }
 
 die () {
-    echo "poptail: $1" >&2
+    [[ "$1" ]] && echo "poptail: $1" >&2
     exit 1
 }
 
 die_usage () {
-    echo "poptail: $1" >&2
-    usage_msg
+    [[ "$1" ]] && echo "poptail: $1" >&2
+    echo "$usage_msg" >&2
     exit 1
 }
 
-usage_msg () {
-    echo "Try 'poptail -h' for more information." >&2
-}
-
 show_help () {
-    echo "\
-Usage: poptail [OPTION]... FILE
-
-Print the last 10 lines of FILE to standard output, and remove the last 10
-lines from FILE.
-
-This is done by reading from the tail of the file and then truncating to the
-position immediately prior to the tail.  Since only the tail is read and no
-part of the file is rewritten, the operation is efficient even for large
-files.
-
-The FILE is locked while it is read and truncated, so poptail can be called
-using parallel to batch process the lines of a file.
-
-Options:
-  -c K  output the last K bytes; alternatively, use -c +K to output bytes
-        starting with the Kth (like tail -c)
-  -n K  output the last K lines, instead of the last 10; or use -n +K to
-        output lines starting with the Kth (like tail -n)
-  -N    dry-run; output the tail of the file and a one-line message of how
-        many bytes would be remove from the file
-  -h    display this help and exit
-  -v    output version and exit
-
-The -c and -n options are passed to tail, which is used to read the end of the
-file.  See the tail man page for an explanation of the details of those
-options, including using '+' as the first character of K and optional
-multiplier suffixes."
+    printf "$help_msg"
 }
 
 show_version () {
-    echo "\
-poptail 0.1.0
-
-Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
-<http://gnu.org/licenses/gpl.html>.
-This is free software: you are free to change and redistribute it.  There is
-NO WARRANTY, to the extent permitted by law.
-
-Written by Don March."
+    printf "$version_msg"
 }
 
-main "$@"
+not_being_sourced && main "$@"

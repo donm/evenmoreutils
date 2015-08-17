@@ -14,6 +14,49 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+readonly help_msg="\
+Usage: peeif [OPTION]... COMMAND...
+
+Pipe a copy of STDIN to each COMMAND, but only if the exit status of the
+previous command was zero.  The exit status of peeif is the exit status of the
+last command that ran.
+
+With the -u argument, the behavior is changed to \"peeuntil\", where each
+command is run until one has an exit status of zero.
+
+Options:
+  -u  pipe STDIN to each CMD until receiving a nonzero exit status
+  -n  do not use a temporary file to hold STDIN and instead use an environment
+      variable
+  -h  display this help and exit
+  -v  output version and exit
+
+STDIN is necessarily read and copied before being sent to any command.  By
+default this is done with a temporary file; if STDIN will fit in a Bash
+variable, you can use '-n' to avoid the creation of temporary files.
+Depending on the system and the size of STDIN, it might be too big for a
+variable to hold.
+
+The name peeif comes from the pee command in moreutils, which is like tee but
+for pipes.
+"
+
+readonly version_msg="\
+peeif 0.1.0
+
+Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.  There is
+NO WARRANTY, to the extent permitted by law.
+
+Written by Don March.
+"
+
+not_being_sourced () { [[ "$0" == "$BASH_SOURCE" ]]; }
+
+set -u
+set -o pipefail
+
 main () {
     parse_args "$@"
 
@@ -25,7 +68,7 @@ main () {
 }
 
 peeif_with_tempfile () {
-    local tmpfile=$(mktemp "peeif.XXXXXX")
+    local tmpfile=$(mktemp --tmpdir "peeif.XXXXXX")
     trap 'rm "$tmpfile"' EXIT
     cat > "$tmpfile"
 
@@ -46,12 +89,13 @@ peeif_with_tempfile () {
 peeif_with_var () {
     # Read stdin into 'caught_stdin' without removing trailing newlines (which
     # happens with command substitution).
-    IFS= read -rd '' caught_stdin
+    set +e
+    IFS= read -rd '' caught_stdin || true
     # Another way to do it is with this trick:
     # caught_stdin=$(cat; echo x)
     # caught_stdin=${caught_stdin%x}
-
     for cmd in "${commands[@]}" ; do
+        set +e
         printf "$caught_stdin" | eval "$cmd"
         local status="$?"
         if [[ $pee_until == 1 ]]; then
@@ -83,51 +127,19 @@ parse_args () {
         esac
     done
     shift $((OPTIND-1))
+    [[ "$#" == 0 ]] && exit 0
     [[ "$1" = "--" ]] && shift
+    [[ "$#" == 0 ]] && exit 0
 
     commands=( "$@" )
 }
 
 show_help () {
-    echo "\
-Usage: peeif [OPTION]... COMMAND...
-
-Pipe a copy of STDIN to each COMMAND, but only if the exit status of the
-previous command was zero.  The exit status of peeif is the exit status of the
-last command that ran.
-
-With the -u argument, the behavior is changed to \"peeuntil\"--each command
-is run until one has an exit status of zero.
-
-Options:
-  -u  pipe STDIN to each CMD until receiving a nonzero exit status
-  -n  do not use a temporary file to hold STDIN and instead use an environment
-      variable
-  -h  display this help and exit
-  -v  output version and exit
-
-STDIN is necessarily read and copied before being sent to any command.  By
-default this is done with a temporary file; if STDIN will fit in a Bash
-variable, you can use '-n' to avoid the creation of temporary files.
-Depending on the system and the size of STDIN, it might be too big for a
-variable to hold.
-
-The name peeif comes from the pee command in moreutils, which is like tee but
-for pipes."
-
+    printf "$help_msg"
 }
 
 show_version () {
-    echo "\
-peeif 0.1.0
-
-Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
-<http://gnu.org/licenses/gpl.html>.
-This is free software: you are free to change and redistribute it.  There is
-NO WARRANTY, to the extent permitted by law.
-
-Written by Don March."
-
+    printf "$version_msg"
 }
 
-main "$@"
+not_being_sourced && main "$@"
