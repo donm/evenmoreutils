@@ -1,0 +1,164 @@
+#!/bin/bash
+# Copyright (c) 2015 Don March <don@ohspite.net>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+set -eu
+set -o pipefail
+
+readonly lockfile_path=/var/lock
+
+main () {
+    parse_args "$@"
+    check_infile
+
+    tail_cmd () { tail "${tail_flags[@]:+${tail_flags[@]}}" "$infile"; }
+
+    set_lockfile
+    (
+        flock -x --timeout 10 9 || die_lock_error
+        if [ $dry_run_opt == 1 ]; then
+            do_dry_run
+        else
+            do_poptail
+        fi
+    ) 9>"$lockfile"
+}
+
+check_infile () {
+    if [ ! -e "$infile" ]; then
+        die "cannot open '$infile' for reading: No such file or directory"
+    elif [ -d "$infile" ]; then
+        die "error reading '$infile': Is a directory"
+    elif [ ! -r "$infile" ]; then
+        die "cannot open '$infile' for reading: Permission denied"
+    elif [ ! -w "$infile" ]; then
+        die "cannot open '$infile' for writing: Permission denied"
+    fi
+}
+
+do_dry_run () {
+    tail_cmd
+    local tail_size=$(tail_cmd | wc -c)
+    echo "$tail_size bytes will be removed from $infile"
+}
+
+do_poptail () {
+    # If ifne is prensent then it can be used to stop the pipe in case an
+    # error happens in tail_cmd.
+    hash ifne 2>/dev/null
+    if [ $? == 0 ]; then
+        tail_cmd | ifne tee >(wc -c | xargs -I {} truncate "$infile" -s -{})
+    else
+        tail_cmd | tee >(wc -c | xargs -I {} truncate "$infile" -s -{})
+    fi
+}
+
+set_lockfile () {
+    local cannonical_fname=$(readlink -f "$infile")
+    lockfile="$lockfile_path/LCK.poptail${cannonical_fname//\//-}"
+}
+
+die () {
+    echo "poptail: $1" >&2
+    exit 1
+}
+
+die_usage () {
+    echo "poptail: $1" >&2
+    usage_msg
+    exit 1
+}
+
+die_lock_error () {
+    die "Lock for poptail not acquired: $lockfile"
+}
+
+usage_msg () {
+    echo "Try 'poptail -h' for more information." >&2
+}
+
+parse_args () {
+    dry_run_opt=0
+    tail_flags=()
+    infile=""
+
+    local OPTIND=1
+    while getopts "Nhvc:n:" opt "$@"; do
+        case "$opt" in
+            c) tail_flags=("-c" "$OPTARG")
+               ;;
+            n) tail_flags=("-n" "$OPTARG")
+               ;;
+            N) dry_run_opt=1
+               ;;
+            h) show_help
+               exit 0
+               ;;
+            v) show_version
+               exit 0
+               ;;
+            *) usage_msg && exit 1
+        esac
+    done
+    shift $((OPTIND-1))
+    [ "$#" == 0 ] && die_usage "missing file argument"
+    [ "$#" -gt  1 ] && die_usage "too many arguments"
+    infile=$1
+}
+
+show_help () {
+    echo "\
+Usage: poptail [OPTION]... FILE
+
+Print the last 10 lines of FILE to standard output, and remove the last 10
+lines from FILE.
+
+This is done by reading from the tail of the file and then truncating to the
+position immediately prior to the tail.  Since only the tail is read and no
+part of the file is rewritten, the operation is efficient even for large
+files.
+
+The FILE is locked while it is read and truncated, so poptail can be called
+using parallel to batch process the lines of a file.
+
+Options:
+  -c K  output the last K bytes; alternatively, use -c +K to output bytes
+        starting with the Kth (like tail -c)
+  -n K  output the last K lines, instead of the last 10; or use -n +K to
+        output lines starting with the Kth (like tail -n)
+  -N    dry-run; output the tail of the file and a one-line message of how
+        many bytes would be remove from the file
+  -h    display this help and exit
+  -v    output version and exit
+
+The -c and -n options are passed to tail, which is used to read the end of the
+file.  See the tail man page for an explanation of the details of those
+options, including using '+' as the first character of K and optional
+multiplier suffixes."
+}
+
+show_version () {
+    echo "\
+poptail 0.1.0
+
+Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
+<http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.  There is
+NO WARRANTY, to the extent permitted by law.
+
+Written by Don March."
+}
+
+main "$@"
