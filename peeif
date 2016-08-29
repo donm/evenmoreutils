@@ -25,7 +25,7 @@ With the -u argument, the behavior is changed to \"peeuntil\", where each
 command is run until one has an exit status of zero.
 
 Options:
-  -u  pipe STDIN to each CMD until receiving a nonzero exit status
+  -u  pipe STDIN to each COMMAND until receiving a nonzero exit status
   -n  do not use a temporary file to hold STDIN and instead use an environment
       variable
   -h  display this help and exit
