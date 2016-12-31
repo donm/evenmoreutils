@@ -1,8 +1,8 @@
 #!/bin/bash
 
-poptail () { bash ../poptail "$@"; }
+poptail () { bash ../bin/poptail "$@"; }
 
-source ../poptail
+source ../bin/poptail
 
 
 setUp () {
@@ -96,4 +96,4 @@ test_version_flag () {
                "$response"
 }
 
-. shunit2
+. ../external/shunit2

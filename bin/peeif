@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2015 Don March <don@ohspite.net>
+# Copyright 2015, 2016 Don March <don@ohspite.net>
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,14 +42,12 @@ for pipes.
 "
 
 readonly version_msg="\
-peeif 0.1.0
+peeif 0.1.1
 
-Copyright (C) 2015. License GPLv3+: GNU GPL version 3 or later
-<http://gnu.org/licenses/gpl.html>.
-This is free software: you are free to change and redistribute it.  There is
-NO WARRANTY, to the extent permitted by law.
-
-Written by Don March.
+Copyright 2016 Don March.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it. There is NO
+WARRANTY, to the extent permitted by law.
 "
 
 not_being_sourced () { [[ "$0" == "$BASH_SOURCE" ]]; }

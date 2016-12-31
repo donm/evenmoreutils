@@ -1,8 +1,8 @@
 #!/bin/bash
 
-peeif () { bash ../peeif "$@"; }
+peeif () { bash ../bin/peeif "$@"; }
 
-source ../peeif
+source ../bin/peeif
 
 test_basic () {
     response=$(echo "ABC" | peeif "tr 'A' 'Z'")
@@ -57,4 +57,4 @@ test_version_flag () {
                "$response"
 }
 
-. shunit2
+. ../external/shunit2
